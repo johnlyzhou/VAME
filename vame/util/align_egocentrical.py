@@ -119,12 +119,12 @@ def background(path_to_file, filename, video_format='.mp4', num_frames=1000):
 
     print('Finishing up!')
     medFrame = np.median(frames, 2)
-    background = scipy.ndimage.median_filter(medFrame, (5, 5))
+    bg = scipy.ndimage.median_filter(medFrame, (5, 5))
 
-    # np.save(path_to_file+'videos/'+'background/'+filename+'-background.npy',background)
+    # np.save(path_to_file+'videos/'+'background/'+filename+'-mean_background.npy',background)
 
     capture.release()
-    return background
+    return bg
 
 
 def align_mouse(path_to_file, filename, video_format, crop_size, pose_list,
@@ -133,7 +133,7 @@ def align_mouse(path_to_file, filename, video_format, crop_size, pose_list,
     # returns: list of cropped images (if video is used) and list of cropped DLC points
     #
     # parameters:
-    #path_to_file: directory
+    # path_to_file: directory
     # filename: name of video file without format
     # video_format: format of video file
     # crop_size: tuple of x and y crop size
@@ -153,7 +153,7 @@ def align_mouse(path_to_file, filename, video_format, crop_size, pose_list,
                 j[0], j[1] = np.nan, np.nan
 
     for i in pose_list:
-        i = interpol(i)
+        interpol(i)
 
     if use_video:
         capture = cv.VideoCapture(os.path.join(
@@ -167,12 +167,14 @@ def align_mouse(path_to_file, filename, video_format, crop_size, pose_list,
 
         if use_video:
             # Read frame
-            try:
-                ret, frame = capture.read()
-                frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-                # frame = frame - bg
-                # frame[frame <= 0] = 0
-            except:
+            ret, frame = capture.read()
+
+            # if ret:
+            #     frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+            #     frame = frame - bg
+            #     frame[frame <= 0] = 0
+
+            if not ret:
                 print("Couldn't find a frame in capture.read(). #Frame: %d" % idx)
                 continue
         else:
@@ -186,13 +188,13 @@ def align_mouse(path_to_file, filename, video_format, crop_size, pose_list,
                 (int(i[idx][0]+crop_size[0]), int(i[idx][1]+crop_size[1])))
 
         img = cv.copyMakeBorder(
-            frame, crop_size[1], crop_size[1], crop_size[0], crop_size[0], cv.BORDER_CONSTANT, 0)
+            frame, crop_size[1], crop_size[1], crop_size[0], crop_size[0], cv.BORDER_CONSTANT, value=(255, 255, 255))
 
         punkte = []
+
+        # instead of using all pose_refs, just use tailbase, body, and ears
         for i in pose_ref_index:
-            coord = []
-            coord.append(pose_list_bordered[i][0])
-            coord.append(pose_list_bordered[i][1])
+            coord = [pose_list_bordered[i][0], pose_list_bordered[i][1]]
             punkte.append(coord)
         punkte = [punkte]
         punkte = np.asarray(punkte)
@@ -204,8 +206,6 @@ def align_mouse(path_to_file, filename, video_format, crop_size, pose_list,
         lst = list(rect)
         lst[1] = crop_size
         rect = tuple(lst)
-
-        center, size, theta = rect
 
         # crop image
         out, shifted_points = crop_and_flip(
@@ -224,6 +224,8 @@ def align_mouse(path_to_file, filename, video_format, crop_size, pose_list,
         for j in range(len(pose_list)):
             time_series[idx:idx+2, i] = points[i][j]
             idx += 2
+
+    # save points to make new DLC file
     np.save("dlc_points.npy", np.asarray(points))
     return images, points, time_series
 
@@ -236,7 +238,7 @@ def play_aligned_video(a, n, frame_count):
     for i in range(frame_count):
         # Capture frame-by-frame
         ret, frame = True, a[i]
-        if ret == True:
+        if ret:
 
             # Display the resulting frame
             frame = cv.cvtColor(frame.astype('uint8')*255, cv.COLOR_GRAY2BGR)
@@ -258,24 +260,25 @@ def play_aligned_video(a, n, frame_count):
 
 
 def save_aligned_video(a, n, frame_count, frame_rate, crop_size):
-    colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255), (0, 0, 0), (255, 255, 255),
-              (127, 0, 0), (0, 127, 0), (0, 0, 127)]
+    colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255), (127, 0, 0),
+              (255, 255, 255), (0, 127, 0), (0, 0, 127)]
     fourcc = cv.VideoWriter_fourcc(*'mp4v')
-    out = cv.VideoWriter('videos/aligned_video.mp4', fourcc, frame_rate, crop_size)
-
+    out = cv.VideoWriter('aligned_video.mp4', fourcc, frame_rate, crop_size)
+    print(len(n[0]))
+    print(n[0])
     for i in range(frame_count):
         # Capture frame-by-frame
-        ret, frame = True, a[i]
-        if ret == True:
+        ret, frame = True, a[i].astype('uint8')
+        if ret:
 
             # Write the resulting frame
-            frame = cv.cvtColor(frame.astype('uint8')*255, cv.COLOR_GRAY2BGR)
-            im_color = cv.applyColorMap(frame, cv.COLORMAP_JET)
+            # frame = cv.cvtColor(frame.astype('uint8')*255, cv.COLOR_GRAY2BGR)
+            # im_color = cv.applyColorMap(frame, cv.COLORMAP_JET)
 
             for c, j in enumerate(n[i]):
-                cv.circle(im_color, (j[0], j[1]), 5, colors[c], -1)
+                cv.circle(frame, (j[0], j[1]), 15, (255, 255, 255), -1)
 
-            out.write(im_color)
+            out.write(frame)
 
     out.release()
 
@@ -320,6 +323,7 @@ def alignment(path_to_file, filename, pose_ref_index, video_format, crop_size, c
         # Change this to an abitrary number if you first want to test the code
         frame_count = len(data)
 
+    # frame_count //= 100
     frames, n, time_series = align_mouse(path_to_file, filename, video_format, crop_size, pose_list, pose_ref_index,
                                          confidence, pose_flip_ref, bg, frame_count, use_video)
 
@@ -332,10 +336,12 @@ def alignment(path_to_file, filename, pose_ref_index, video_format, crop_size, c
     return time_series, frames
 
 
-def egocentric_alignment(config, pose_ref_index=[0, 5], crop_size=(300, 300), frame_rate=30.0, 
+def egocentric_alignment(config, pose_ref_index=None, crop_size=(300, 300), frame_rate=30.0,
                          use_video=False, video_format='.mp4', check_video=False, save_video=False):
     """ Happy aligning """
     # config parameters
+    if pose_ref_index is None:
+        pose_ref_index = [0, 4]
     config_file = Path(config).resolve()
     cfg = read_config(config_file)
 
@@ -349,10 +355,10 @@ def egocentric_alignment(config, pose_ref_index=[0, 5], crop_size=(300, 300), fr
     for file in filename:
         print("Aligning data %s, Pose confidence value: %.2f" %
               (file, confidence))
-        egocentric_time_series, frames = alignment(path_to_file, file, pose_ref_index, video_format, crop_size, confidence, frame_rate, 
-                                                   use_video=use_video, check_video=check_video, save_video=save_video)
+        egocentric_time_series, frames = alignment(path_to_file, file, pose_ref_index, video_format, crop_size,
+                                                   confidence, frame_rate, use_video=use_video, check_video=check_video,
+                                                   save_video=save_video)
         np.save(os.path.join(path_to_file, 'data', file,
                 file+'-PE-seq.npy'), egocentric_time_series)
-#        np.save(os.path.join(path_to_file,'data/',file,"",file+'-PE-seq.npy', egocentric_time_series))
 
-    print("Your data is now ine right format and you can call vame.create_trainset()")
+    print("Your data is now in the right format and you can call vame.create_trainset()")
