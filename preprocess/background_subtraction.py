@@ -1,8 +1,6 @@
 import cv2 as cv
 import numpy as np
 from tqdm import tqdm
-import multiprocessing
-import os
 
 
 def get_background(path, num_batches=10, save=True):
