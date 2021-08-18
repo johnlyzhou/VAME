@@ -69,7 +69,6 @@ def crop_and_flip(rect, src, points, ref_index):
         # Perform rotation on src image
         dst = cv.warpAffine(out.astype('float32'), M, out.shape[:2])
         out = cv.getRectSubPix(dst, size, center)
-
     return out, dlc_points_shifted
 
 
@@ -225,7 +224,7 @@ def align_mouse(path_to_file, filename, video_format, crop_size, pose_list,
         for j in range(len(pose_list)):
             time_series[idx:idx+2, i] = points[i][j]
             idx += 2
-
+    np.save("dlc_points.npy", np.asarray(points))
     return images, points, time_series
 
 
@@ -261,8 +260,8 @@ def play_aligned_video(a, n, frame_count):
 def save_aligned_video(a, n, frame_count, frame_rate, crop_size):
     colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255), (0, 0, 0), (255, 255, 255),
               (127, 0, 0), (0, 127, 0), (0, 0, 127)]
-    fourcc = cv.VideoWriter_fourcc(*'MJPG')
-    out = cv.VideoWriter('videos/aligned_video.avi', fourcc, frame_rate, crop_size)
+    fourcc = cv.VideoWriter_fourcc(*'mp4v')
+    out = cv.VideoWriter('videos/aligned_video.mp4', fourcc, frame_rate, crop_size)
 
     for i in range(frame_count):
         # Capture frame-by-frame
@@ -307,7 +306,7 @@ def alignment(path_to_file, filename, pose_ref_index, video_format, crop_size, c
 
     if use_video:
         # compute background
-        bg = background(path_to_file, filename)
+        bg = 0
         capture = cv.VideoCapture(os.path.join(
             path_to_file, 'videos', filename+video_format))
         if not capture.isOpened():
