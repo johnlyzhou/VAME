@@ -15,9 +15,9 @@ date = mydate.date().strftime("%-d")
 # Initialize your project
 config = vame.init_new_project(
     project=project, videos=videos, working_directory=working_directory, videotype='.mp4')
-os.system('cp {} /Users/johnzhou/code/ps_vae-{}{}-2021/videos/pose_estimation'.format(csv, short_month, date))
+os.system('cp {} {}/ps_vae-{}{}-2021/videos/pose_estimation'.format(working_directory, csv, short_month, date))
 
 # Run egocentric alignment and save video
 vame.egocentric_alignment(
     config, pose_ref_index=[0, 3], crop_size=(192, 192), use_video=True, check_video=False, save_video=True)
-os.system('rm -rf /Users/johnzhou/code/ps_vae-{}{}-2021'.format(short_month, date))
+os.system('rm -rf {}/ps_vae-{}{}-2021'.format(working_directory, short_month, date))
